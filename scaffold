@@ -3159,8 +3159,8 @@ MKEOF
       if [[ -n "$ci_step" ]]; then
         local ci_tmp
         ci_tmp="$(mktemp)"
-        awk -v steps="$ci_step" '
-          /- name: Run checks/ { print steps; print ""; }
+        AWK_STEPS="$ci_step" awk '
+          /- name: Run checks/ { print ENVIRON["AWK_STEPS"]; print ""; }
           { print }
         ' "$ci_file" > "$ci_tmp"
         mv "$ci_tmp" "$ci_file"
