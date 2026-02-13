@@ -56,6 +56,7 @@ PYTHON_TYPE_CMD     := python -m mypy .
 PYTHON_BUILD_CMD    := @echo "Python: no compilation needed"
 PYTHON_COV_FLAGS    := --cov --cov-report=term-missing --cov-report=html:coverage_html
 PYTHON_FILE_CMD     := python -m pytest
+PYTHON_SETUP_CMD    := python -m venv .venv && . .venv/bin/activate && pip install -e '.[dev]' 2>/dev/null || pip install -e .
 
 # ---------------------------------------------------------------------------
 # TypeScript Configuration
@@ -70,6 +71,7 @@ TS_TYPE_CMD         := npx tsc --noEmit
 TS_BUILD_CMD        := npx tsc
 TS_COV_FLAGS        := --coverage
 TS_FILE_CMD         := npx vitest run
+TS_SETUP_CMD        := npm install
 
 # ---------------------------------------------------------------------------
 # Go Configuration
@@ -84,6 +86,7 @@ GO_TYPE_CMD         := @echo "Go: type checking included in build"
 GO_BUILD_CMD        := go build ./...
 GO_COV_FLAGS        := -coverprofile=coverage.out
 GO_FILE_CMD         := go test
+GO_SETUP_CMD        := go mod download
 
 # ---------------------------------------------------------------------------
 # Rust Configuration
@@ -98,6 +101,7 @@ RUST_TYPE_CMD       := @echo "Rust: type checking included in build"
 RUST_BUILD_CMD      := cargo build
 RUST_COV_FLAGS      :=
 RUST_FILE_CMD       := cargo test
+RUST_SETUP_CMD      := cargo fetch
 
 # ---------------------------------------------------------------------------
 # Resolve commands based on detected language
@@ -113,6 +117,7 @@ ifeq ($(DETECTED_LANG),python)
   BUILD_CMD    := $(PYTHON_BUILD_CMD)
   COV_FLAGS    := $(PYTHON_COV_FLAGS)
   FILE_CMD     := $(PYTHON_FILE_CMD)
+  SETUP_CMD    := $(PYTHON_SETUP_CMD)
 else ifeq ($(DETECTED_LANG),typescript)
   TEST_CMD     := $(TS_TEST_CMD)
   UNIT_DIR     := $(TS_UNIT_DIR)
@@ -124,6 +129,7 @@ else ifeq ($(DETECTED_LANG),typescript)
   BUILD_CMD    := $(TS_BUILD_CMD)
   COV_FLAGS    := $(TS_COV_FLAGS)
   FILE_CMD     := $(TS_FILE_CMD)
+  SETUP_CMD    := $(TS_SETUP_CMD)
 else ifeq ($(DETECTED_LANG),go)
   TEST_CMD     := $(GO_TEST_CMD)
   UNIT_DIR     := $(GO_UNIT_DIR)
@@ -135,6 +141,7 @@ else ifeq ($(DETECTED_LANG),go)
   BUILD_CMD    := $(GO_BUILD_CMD)
   COV_FLAGS    := $(GO_COV_FLAGS)
   FILE_CMD     := $(GO_FILE_CMD)
+  SETUP_CMD    := $(GO_SETUP_CMD)
 else ifeq ($(DETECTED_LANG),rust)
   TEST_CMD     := $(RUST_TEST_CMD)
   UNIT_DIR     := $(RUST_UNIT_DIR)
@@ -146,6 +153,7 @@ else ifeq ($(DETECTED_LANG),rust)
   BUILD_CMD    := $(RUST_BUILD_CMD)
   COV_FLAGS    := $(RUST_COV_FLAGS)
   FILE_CMD     := $(RUST_FILE_CMD)
+  SETUP_CMD    := $(RUST_SETUP_CMD)
 endif
 
 # ---------------------------------------------------------------------------
@@ -163,7 +171,7 @@ endif
 # ---------------------------------------------------------------------------
 
 .PHONY: test test-unit test-integration test-agent test-file test-coverage \
-        lint fmt typecheck build check setup-github help
+        lint fmt typecheck build check setup setup-github help
 
 ## Run full test suite: unit → integration → agent (fail-fast)
 ## For Rust: cargo test runs all tests; tiers are filtered by test name prefix
@@ -250,6 +258,18 @@ build:
 check: lint typecheck test
 	@echo "✅ All checks passed — ready for PR."
 
+## Bootstrap dev environment: install deps, set up pre-commit
+setup:
+	@echo "═══ Setting up development environment ($(DETECTED_LANG)) ═══"
+	@echo "--- Installing dependencies ---"
+	$(SETUP_CMD)
+	@if [ -f .pre-commit-config.yaml ]; then \
+		echo "--- Setting up pre-commit hooks ---"; \
+		pre-commit install 2>/dev/null || echo "⚠️  pre-commit not found — install with: pip install pre-commit"; \
+	fi
+	@echo ""
+	@echo "✅ Setup complete. Run 'make check' to verify everything works."
+
 ## Set up GitHub labels and project management
 setup-github:
 	@echo "═══ Setting up GitHub project management ═══"
@@ -283,6 +303,7 @@ help:
 	@echo "  make typecheck         Run type checker"
 	@echo "  make build             Compile / build"
 	@echo "  make check             Lint + typecheck + full suite (pre-PR gate)"
+	@echo "  make setup             Bootstrap dev environment (deps + pre-commit)"
 	@echo "  make setup-github      Create GitHub labels (requires gh CLI)"
 	@echo ""
 	@echo "Options:"

@@ -15,6 +15,7 @@
 #   ./scaffold --help           Show help
 #   ./scaffold --keep           Don't remove scaffold artifacts after init
 #   ./scaffold --non-interactive Use defaults for all prompts
+#   ./scaffold --dry-run        Preview what would be created
 # =============================================================================
 set -euo pipefail
 
@@ -24,6 +25,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 KEEP_ARTIFACTS=false
 NON_INTERACTIVE=false
+DRY_RUN=false
 PROJECT_NAME=""
 PROJECT_DESC=""
 LANGUAGE=""
@@ -36,6 +38,7 @@ ALLOW_DOCKER=false
 SETUP_LABELS=false
 SETUP_KANBAN=false
 ENABLE_DOCKER=false
+ARCHETYPE="none"
 
 # Colors (disabled if not a terminal)
 if [[ -t 1 ]]; then
@@ -246,6 +249,10 @@ parse_flags() {
         NON_INTERACTIVE=true
         shift
         ;;
+      --dry-run)
+        DRY_RUN=true
+        shift
+        ;;
       --update)
         run_update
         exit 0
@@ -270,13 +277,15 @@ Options:
   --help, -h          Show this help message
   --keep              Don't remove scaffold artifacts after init
   --non-interactive   Use defaults for all prompts (for CI/automation)
+  --dry-run           Preview what would be created without writing anything
   --update            Update skills, agents, and hooks from scaffold repo
 
 What it does:
-  1. Asks for project name, description, and language
+  1. Asks for project name, description, language, and archetype
   2. Configures Claude Code permissions based on your preferences
   3. Sets up language-specific tooling (linter, formatter, test runner)
-  4. Optionally integrates Ralph Wiggum autonomous loop
+  4. Generates archetype structure (CLI, API, or library starter files)
+  5. Optionally integrates Ralph Wiggum autonomous loop
   5. Helps you create or load a project plan
   6. Initializes git with a clean first commit
   7. Removes scaffold artifacts (unless --keep is used)
@@ -290,6 +299,128 @@ Non-interactive defaults:
   Ralph Wiggum:    disabled
   Project plan:    template only
 HELP
+}
+
+# ---------------------------------------------------------------------------
+# Dry-run report — show what would be created without writing anything
+# ---------------------------------------------------------------------------
+dry_run_report() {
+  echo ""
+  header "Dry Run Preview"
+  echo ""
+  echo -e "  ${BOLD}Project:${RESET}     $PROJECT_NAME"
+  echo -e "  ${BOLD}Description:${RESET} $PROJECT_DESC"
+  echo -e "  ${BOLD}Language:${RESET}    $LANGUAGE"
+  echo -e "  ${BOLD}Archetype:${RESET}  $ARCHETYPE"
+  echo -e "  ${BOLD}Docker:${RESET}      $ENABLE_DOCKER"
+  echo -e "  ${BOLD}Ralph:${RESET}       $ENABLE_RALPH"
+  echo ""
+  echo -e "${BOLD}Files that would be created:${RESET}"
+  echo ""
+
+  # Common files (always created)
+  echo "  CLAUDE.md"
+  echo "  README.md"
+  echo "  GETTING_STARTED.md"
+  echo "  LICENSE"
+  echo "  Makefile"
+  echo "  .gitignore"
+  echo "  .env.example"
+  echo "  CHANGELOG.md"
+  echo "  .pre-commit-config.yaml"
+  echo "  .claude/settings.json"
+  echo "  .claude/hooks/protect-main-branch.sh"
+
+  # Skills
+  local skills=(plan review test lesson checkpoint status simplify index save load backlog doctor start)
+  for s in "${skills[@]}"; do
+    echo "  .claude/skills/$s/SKILL.md"
+  done
+
+  # GitHub
+  echo "  .github/ISSUE_TEMPLATE/bug.yml"
+  echo "  .github/ISSUE_TEMPLATE/feature.yml"
+  echo "  .github/ISSUE_TEMPLATE/task.yml"
+  echo "  .github/ISSUE_TEMPLATE/config.yml"
+  echo "  .github/pull_request_template.md"
+  echo "  .github/workflows/ci.yml"
+  echo "  .github/workflows/release.yml"
+
+  # Agents
+  local agents=(plan-agent research-agent code-review-agent test-runner-agent build-validator-agent code-architect-agent code-simplifier-agent verify-agent)
+  echo "  agents/README.md"
+  for a in "${agents[@]}"; do
+    echo "  agents/$a.md"
+  done
+
+  # Tasks
+  echo "  tasks/todo.md"
+  echo "  tasks/lessons.md"
+  echo "  tasks/tests.md"
+  echo "  tasks/session.md"
+
+  # Test dirs
+  echo "  tests/unit/"
+  echo "  tests/integration/"
+  echo "  tests/agent/"
+  echo "  scratch/.gitkeep"
+
+  # Language-specific files
+  local pkg_name="${PROJECT_NAME//-/_}"
+  case "$LANGUAGE" in
+    python)
+      echo "  pyproject.toml"
+      echo "  ruff.toml"
+      echo "  conftest.py"
+      echo "  src/${pkg_name}/__init__.py"
+      case "$ARCHETYPE" in
+        cli)      echo "  src/${pkg_name}/cli.py"; echo "  src/${pkg_name}/__main__.py" ;;
+        api)      echo "  src/${pkg_name}/app.py"; echo "  src/${pkg_name}/routes/health.py" ;;
+        library)  echo "  src/${pkg_name}/lib.py" ;;
+      esac
+      ;;
+    typescript)
+      echo "  package.json"
+      echo "  tsconfig.json"
+      echo "  eslint.config.mjs"
+      case "$ARCHETYPE" in
+        cli)      echo "  src/cli.ts" ;;
+        api)      echo "  src/app.ts"; echo "  src/routes/health.ts" ;;
+        *)        echo "  src/index.ts" ;;
+      esac
+      ;;
+    go)
+      echo "  go.mod"
+      case "$ARCHETYPE" in
+        api)      echo "  cmd/${PROJECT_NAME}/main.go"; echo "  internal/routes/health.go" ;;
+        library)  echo "  ${pkg_name}.go" ;;
+        *)        echo "  cmd/${PROJECT_NAME}/main.go" ;;
+      esac
+      ;;
+    rust)
+      echo "  Cargo.toml"
+      case "$ARCHETYPE" in
+        library)  echo "  src/lib.rs" ;;
+        *)        echo "  src/main.rs" ;;
+      esac
+      ;;
+  esac
+
+  # Docker
+  if [[ "$ENABLE_DOCKER" == true ]]; then
+    echo "  Dockerfile"
+    echo "  docker-compose.yml"
+  fi
+
+  # Ralph
+  if [[ "$ENABLE_RALPH" == true ]]; then
+    echo "  scripts/ralph-loop.sh"
+    echo "  PROMPT_build.md"
+    echo "  PROMPT_plan.md"
+  fi
+
+  echo ""
+  echo -e "${GREEN}No files were written. Run without --dry-run to scaffold.${RESET}"
 }
 
 # ---------------------------------------------------------------------------
@@ -355,6 +486,36 @@ step_language() {
         info "${DIM}Run: cargo build${RESET}"
         ;;
     esac
+  fi
+}
+
+# ---------------------------------------------------------------------------
+# Step 2b: Project archetype
+# ---------------------------------------------------------------------------
+step_archetype() {
+  # Skip if no language selected — archetypes need language context
+  if [[ "$LANGUAGE" == "none" ]]; then
+    return
+  fi
+
+  header "Project Archetype"
+
+  info "Choose an archetype to generate starter project structure."
+  info "  This creates entry points, routes, or module layout based on your project type."
+  echo ""
+
+  prompt_choice ARCHETYPE "Select project archetype:" \
+    "none      — blank project (just language tooling)" \
+    "cli       — command-line tool with argument parsing" \
+    "api       — web API with routes and health check" \
+    "library   — reusable library with public API"
+
+  ARCHETYPE="${ARCHETYPE%% *}"
+
+  if [[ "$ARCHETYPE" == "none" ]]; then
+    info "No archetype selected. Starting with a blank project."
+  else
+    success "Archetype: $ARCHETYPE"
   fi
 }
 
@@ -688,6 +849,502 @@ apply_github_pm() {
 }
 
 # ---------------------------------------------------------------------------
+# Apply: Archetype-specific project structure
+# ---------------------------------------------------------------------------
+apply_archetype() {
+  local escaped_name="$1"
+  local pkg_name="${PROJECT_NAME//-/_}"
+
+  info "Creating project structure (archetype: $ARCHETYPE)..."
+
+  case "$LANGUAGE" in
+    python)
+      mkdir -p "$SCRIPT_DIR/src/$pkg_name"
+      touch "$SCRIPT_DIR/src/$pkg_name/__init__.py"
+
+      case "$ARCHETYPE" in
+        cli)
+          cat > "$SCRIPT_DIR/src/$pkg_name/__main__.py" <<PYEOF
+"""Allow running as: python -m $pkg_name"""
+from ${pkg_name}.cli import main
+
+if __name__ == "__main__":
+    main()
+PYEOF
+          cat > "$SCRIPT_DIR/src/$pkg_name/cli.py" <<'PYEOF'
+"""Command-line interface for {{PROJECT_NAME}}."""
+import argparse
+import sys
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="{{PROJECT_NAME}}",
+        description="{{PROJECT_DESC}}",
+    )
+    parser.add_argument("--version", action="version", version="%(prog)s 0.1.0")
+
+    subparsers = parser.add_subparsers(dest="command", help="Available commands")
+
+    # Example subcommand — replace with your own
+    run_parser = subparsers.add_parser("run", help="Run the main task")
+    run_parser.add_argument("target", nargs="?", default="world", help="Target to process")
+
+    return parser
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = build_parser()
+    args = parser.parse_args(argv)
+
+    if args.command is None:
+        parser.print_help()
+        sys.exit(0)
+
+    if args.command == "run":
+        print(f"Running with target: {args.target}")
+PYEOF
+          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/$pkg_name/cli.py"
+          sed -i "s/{{PROJECT_DESC}}/${PROJECT_DESC//\//\\/}/g" "$SCRIPT_DIR/src/$pkg_name/cli.py"
+          success "  Created CLI archetype: src/$pkg_name/cli.py, __main__.py"
+          ;;
+        api)
+          mkdir -p "$SCRIPT_DIR/src/$pkg_name/routes"
+          touch "$SCRIPT_DIR/src/$pkg_name/routes/__init__.py"
+          cat > "$SCRIPT_DIR/src/$pkg_name/app.py" <<'PYEOF'
+"""{{PROJECT_NAME}} — API application."""
+from http.server import HTTPServer
+
+from {{PKG_NAME}}.routes.health import HealthHandler
+
+
+def create_app(host: str = "0.0.0.0", port: int = 8000) -> HTTPServer:
+    """Create and return the HTTP server."""
+    server = HTTPServer((host, port), HealthHandler)
+    return server
+
+
+def main() -> None:
+    """Start the development server."""
+    server = create_app()
+    print(f"Server running on http://localhost:{server.server_address[1]}")
+    try:
+        server.serve_forever()
+    except KeyboardInterrupt:
+        print("\nShutting down.")
+        server.server_close()
+
+
+if __name__ == "__main__":
+    main()
+PYEOF
+          cat > "$SCRIPT_DIR/src/$pkg_name/routes/health.py" <<'PYEOF'
+"""Health check endpoint."""
+import json
+from http.server import BaseHTTPRequestHandler
+
+
+class HealthHandler(BaseHTTPRequestHandler):
+    """Handle HTTP requests."""
+
+    def do_GET(self) -> None:
+        if self.path == "/health":
+            self._json_response(200, {"status": "ok"})
+        else:
+            self._json_response(404, {"error": "not found"})
+
+    def _json_response(self, status: int, body: dict) -> None:
+        self.send_response(status)
+        self.send_header("Content-Type", "application/json")
+        self.end_headers()
+        self.wfile.write(json.dumps(body).encode())
+PYEOF
+          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/$pkg_name/app.py"
+          sed -i "s/{{PKG_NAME}}/${pkg_name}/g" "$SCRIPT_DIR/src/$pkg_name/app.py"
+          success "  Created API archetype: src/$pkg_name/app.py, routes/health.py"
+          ;;
+        library)
+          cat > "$SCRIPT_DIR/src/$pkg_name/lib.py" <<'PYEOF'
+"""{{PROJECT_NAME}} — public API."""
+
+
+def hello(name: str = "world") -> str:
+    """Return a greeting. Replace with your library's public API."""
+    return f"Hello, {name}!"
+PYEOF
+          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/$pkg_name/lib.py"
+          success "  Created library archetype: src/$pkg_name/lib.py"
+          ;;
+        *)
+          success "  Created src/$pkg_name/"
+          ;;
+      esac
+      ;;
+
+    typescript)
+      mkdir -p "$SCRIPT_DIR/src"
+
+      case "$ARCHETYPE" in
+        cli)
+          cat > "$SCRIPT_DIR/src/cli.ts" <<'TSEOF'
+/**
+ * CLI entry point for {{PROJECT_NAME}}.
+ */
+
+interface ParsedArgs {
+  command: string | null;
+  target: string;
+  flags: Record<string, boolean>;
+}
+
+function parseArgs(argv: string[]): ParsedArgs {
+  const args = argv.slice(2);
+  const flags: Record<string, boolean> = {};
+  const positional: string[] = [];
+
+  for (const arg of args) {
+    if (arg.startsWith("--")) {
+      flags[arg.slice(2)] = true;
+    } else {
+      positional.push(arg);
+    }
+  }
+
+  return {
+    command: positional[0] ?? null,
+    target: positional[1] ?? "world",
+    flags,
+  };
+}
+
+function main(): void {
+  const { command, target, flags } = parseArgs(process.argv);
+
+  if (flags.version) {
+    console.log("{{PROJECT_NAME}} 0.1.0");
+    return;
+  }
+
+  if (flags.help || command === null) {
+    console.log("Usage: {{PROJECT_NAME}} <command> [target]");
+    console.log("");
+    console.log("Commands:");
+    console.log("  run [target]  Run the main task");
+    return;
+  }
+
+  if (command === "run") {
+    console.log(`Running with target: ${target}`);
+  }
+}
+
+main();
+TSEOF
+          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/cli.ts"
+          success "  Created CLI archetype: src/cli.ts"
+          ;;
+        api)
+          mkdir -p "$SCRIPT_DIR/src/routes"
+          cat > "$SCRIPT_DIR/src/app.ts" <<'TSEOF'
+/**
+ * {{PROJECT_NAME}} — API application.
+ */
+import { createServer, IncomingMessage, ServerResponse } from "node:http";
+import { healthHandler } from "./routes/health.js";
+
+const PORT = parseInt(process.env.PORT ?? "3000", 10);
+
+function router(req: IncomingMessage, res: ServerResponse): void {
+  if (req.url === "/health" && req.method === "GET") {
+    healthHandler(req, res);
+  } else {
+    res.writeHead(404, { "Content-Type": "application/json" });
+    res.end(JSON.stringify({ error: "not found" }));
+  }
+}
+
+const server = createServer(router);
+
+server.listen(PORT, () => {
+  console.log(`Server running on http://localhost:${PORT}`);
+});
+TSEOF
+          cat > "$SCRIPT_DIR/src/routes/health.ts" <<'TSEOF'
+/**
+ * Health check endpoint.
+ */
+import { IncomingMessage, ServerResponse } from "node:http";
+
+export function healthHandler(_req: IncomingMessage, res: ServerResponse): void {
+  res.writeHead(200, { "Content-Type": "application/json" });
+  res.end(JSON.stringify({ status: "ok" }));
+}
+TSEOF
+          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/app.ts"
+          success "  Created API archetype: src/app.ts, src/routes/health.ts"
+          ;;
+        library)
+          cat > "$SCRIPT_DIR/src/index.ts" <<'TSEOF'
+/**
+ * {{PROJECT_NAME}} — public API.
+ */
+
+/**
+ * Return a greeting. Replace with your library's public API.
+ */
+export function hello(name: string = "world"): string {
+  return `Hello, ${name}!`;
+}
+TSEOF
+          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/index.ts"
+          success "  Created library archetype: src/index.ts"
+          ;;
+        *)
+          cat > "$SCRIPT_DIR/src/index.ts" <<'TSEOF'
+export function main(): void {
+  console.log("Hello from {{PROJECT_NAME}}");
+}
+TSEOF
+          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/index.ts"
+          success "  Created src/index.ts"
+          ;;
+      esac
+      ;;
+
+    go)
+      case "$ARCHETYPE" in
+        cli)
+          mkdir -p "$SCRIPT_DIR/cmd/$PROJECT_NAME"
+          cat > "$SCRIPT_DIR/cmd/$PROJECT_NAME/main.go" <<'GOEOF'
+package main
+
+import (
+	"fmt"
+	"os"
+)
+
+func main() {
+	if len(os.Args) < 2 {
+		printUsage()
+		os.Exit(0)
+	}
+
+	switch os.Args[1] {
+	case "run":
+		target := "world"
+		if len(os.Args) > 2 {
+			target = os.Args[2]
+		}
+		fmt.Printf("Running with target: %s\n", target)
+	case "--version":
+		fmt.Println("{{PROJECT_NAME}} 0.1.0")
+	case "--help":
+		printUsage()
+	default:
+		fmt.Fprintf(os.Stderr, "Unknown command: %s\n", os.Args[1])
+		os.Exit(1)
+	}
+}
+
+func printUsage() {
+	fmt.Println("Usage: {{PROJECT_NAME}} <command> [target]")
+	fmt.Println("")
+	fmt.Println("Commands:")
+	fmt.Println("  run [target]  Run the main task")
+}
+GOEOF
+          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/cmd/$PROJECT_NAME/main.go"
+          success "  Created CLI archetype: cmd/$PROJECT_NAME/main.go"
+          ;;
+        api)
+          mkdir -p "$SCRIPT_DIR/cmd/$PROJECT_NAME"
+          mkdir -p "$SCRIPT_DIR/internal/routes"
+          cat > "$SCRIPT_DIR/cmd/$PROJECT_NAME/main.go" <<'GOEOF'
+package main
+
+import (
+	"fmt"
+	"log"
+	"net/http"
+	"os"
+
+	"{{PROJECT_NAME}}/internal/routes"
+)
+
+func main() {
+	port := os.Getenv("PORT")
+	if port == "" {
+		port = "8080"
+	}
+
+	mux := http.NewServeMux()
+	mux.HandleFunc("GET /health", routes.HealthHandler)
+
+	fmt.Printf("Server running on http://localhost:%s\n", port)
+	log.Fatal(http.ListenAndServe(":"+port, mux))
+}
+GOEOF
+          cat > "$SCRIPT_DIR/internal/routes/health.go" <<'GOEOF'
+package routes
+
+import (
+	"encoding/json"
+	"net/http"
+)
+
+// HealthHandler returns the health status of the service.
+func HealthHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
+}
+GOEOF
+          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/cmd/$PROJECT_NAME/main.go"
+          success "  Created API archetype: cmd/$PROJECT_NAME/main.go, internal/routes/health.go"
+          ;;
+        library)
+          cat > "$SCRIPT_DIR/${pkg_name}.go" <<'GOEOF'
+// Package {{PKG_NAME}} provides the public API.
+package {{PKG_NAME}}
+
+// Hello returns a greeting. Replace with your library's public API.
+func Hello(name string) string {
+	if name == "" {
+		name = "world"
+	}
+	return "Hello, " + name + "!"
+}
+GOEOF
+          sed -i "s/{{PKG_NAME}}/${pkg_name}/g" "$SCRIPT_DIR/${pkg_name}.go"
+          success "  Created library archetype: ${pkg_name}.go"
+          ;;
+        *)
+          mkdir -p "$SCRIPT_DIR/cmd/$PROJECT_NAME"
+          cat > "$SCRIPT_DIR/cmd/$PROJECT_NAME/main.go" <<'GOEOF'
+package main
+
+import "fmt"
+
+func main() {
+	fmt.Println("Hello from {{PROJECT_NAME}}")
+}
+GOEOF
+          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/cmd/$PROJECT_NAME/main.go"
+          success "  Created cmd/$PROJECT_NAME/main.go"
+          ;;
+      esac
+      ;;
+
+    rust)
+      mkdir -p "$SCRIPT_DIR/src"
+
+      case "$ARCHETYPE" in
+        cli)
+          cat > "$SCRIPT_DIR/src/main.rs" <<'RSEOF'
+//! CLI entry point for {{PROJECT_NAME}}.
+use std::env;
+use std::process;
+
+fn main() {
+    let args: Vec<String> = env::args().collect();
+
+    if args.len() < 2 {
+        print_usage();
+        process::exit(0);
+    }
+
+    match args[1].as_str() {
+        "run" => {
+            let target = args.get(2).map(|s| s.as_str()).unwrap_or("world");
+            println!("Running with target: {target}");
+        }
+        "--version" => println!("{{PROJECT_NAME}} 0.1.0"),
+        "--help" => print_usage(),
+        cmd => {
+            eprintln!("Unknown command: {cmd}");
+            process::exit(1);
+        }
+    }
+}
+
+fn print_usage() {
+    println!("Usage: {{PROJECT_NAME}} <command> [target]");
+    println!();
+    println!("Commands:");
+    println!("  run [target]  Run the main task");
+}
+RSEOF
+          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/main.rs"
+          success "  Created CLI archetype: src/main.rs"
+          ;;
+        api)
+          cat > "$SCRIPT_DIR/src/main.rs" <<'RSEOF'
+//! {{PROJECT_NAME}} — API server.
+use std::io::Write;
+use std::net::TcpListener;
+
+fn main() {
+    let port = std::env::var("PORT").unwrap_or_else(|_| "8080".to_string());
+    let addr = format!("0.0.0.0:{port}");
+    let listener = TcpListener::bind(&addr).expect("Failed to bind");
+    println!("Server running on http://localhost:{port}");
+
+    for stream in listener.incoming() {
+        if let Ok(mut stream) = stream {
+            let response = "HTTP/1.1 200 OK\r\nContent-Type: application/json\r\n\r\n{\"status\":\"ok\"}";
+            let _ = stream.write_all(response.as_bytes());
+        }
+    }
+}
+RSEOF
+          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/main.rs"
+          success "  Created API archetype: src/main.rs"
+          ;;
+        library)
+          cat > "$SCRIPT_DIR/src/lib.rs" <<'RSEOF'
+//! {{PROJECT_NAME}} — public API.
+
+/// Return a greeting. Replace with your library's public API.
+pub fn hello(name: &str) -> String {
+    if name.is_empty() {
+        return "Hello, world!".to_string();
+    }
+    format!("Hello, {name}!")
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_hello_with_name() {
+        assert_eq!(hello("Rust"), "Hello, Rust!");
+    }
+
+    #[test]
+    fn test_hello_empty() {
+        assert_eq!(hello(""), "Hello, world!");
+    }
+}
+RSEOF
+          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/lib.rs"
+          # Remove default main.rs for library archetype
+          success "  Created library archetype: src/lib.rs"
+          ;;
+        *)
+          cat > "$SCRIPT_DIR/src/main.rs" <<'RSEOF'
+fn main() {
+    println!("Hello from {{PROJECT_NAME}}");
+}
+RSEOF
+          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/main.rs"
+          success "  Created src/main.rs"
+          ;;
+      esac
+      ;;
+  esac
+}
+
+# ---------------------------------------------------------------------------
 # Apply: Template engine
 # ---------------------------------------------------------------------------
 apply_templates() {
@@ -747,49 +1404,8 @@ apply_templates() {
       success "  Updated .gitignore with $LANGUAGE entries"
     fi
 
-    # Create src directory
-    case "$LANGUAGE" in
-      python)
-        local pkg_name="${PROJECT_NAME//-/_}"
-        mkdir -p "$SCRIPT_DIR/src/$pkg_name"
-        touch "$SCRIPT_DIR/src/$pkg_name/__init__.py"
-        success "  Created src/$pkg_name/"
-        ;;
-      typescript)
-        mkdir -p "$SCRIPT_DIR/src"
-        cat > "$SCRIPT_DIR/src/index.ts" <<'TS'
-export function main(): void {
-  console.log("Hello from {{PROJECT_NAME}}");
-}
-TS
-        sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/index.ts"
-        success "  Created src/index.ts"
-        ;;
-      go)
-        mkdir -p "$SCRIPT_DIR/cmd/$PROJECT_NAME"
-        cat > "$SCRIPT_DIR/cmd/$PROJECT_NAME/main.go" <<'GO'
-package main
-
-import "fmt"
-
-func main() {
-	fmt.Println("Hello from {{PROJECT_NAME}}")
-}
-GO
-        sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/cmd/$PROJECT_NAME/main.go"
-        success "  Created cmd/$PROJECT_NAME/main.go"
-        ;;
-      rust)
-        mkdir -p "$SCRIPT_DIR/src"
-        cat > "$SCRIPT_DIR/src/main.rs" <<'RUST'
-fn main() {
-    println!("Hello from {{PROJECT_NAME}}");
-}
-RUST
-        sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/main.rs"
-        success "  Created src/main.rs"
-        ;;
-    esac
+    # Create src directory + archetype files
+    apply_archetype "$escaped_name"
   fi
 
   # --- Configure permissions ---
@@ -1473,7 +2089,7 @@ show_summary() {
   echo -e "  ${BOLD}.github/${RESET}            Issue templates, PR template, CI workflow"
   echo -e "  ${BOLD}agents/${RESET}             8 agent specifications"
   echo -e "  ${BOLD}tasks/${RESET}              Plan, lessons, test registry"
-  echo -e "  ${BOLD}Makefile${RESET}            test, lint, fmt, typecheck, build, check, setup-github"
+  echo -e "  ${BOLD}Makefile${RESET}            test, lint, fmt, typecheck, build, check, setup, setup-github"
   echo -e "  ${BOLD}.pre-commit${RESET}         Linting + secret scanning on commit"
 
   if [[ "$LANGUAGE" != "none" ]]; then
@@ -1491,8 +2107,9 @@ show_summary() {
   echo ""
   echo "Next steps:"
   echo "  1. cd $(basename "$SCRIPT_DIR")"
-  echo "  2. Start Claude Code: claude"
-  echo "  3. Type: /start"
+  echo "  2. Bootstrap dev environment: make setup"
+  echo "  3. Start Claude Code: claude"
+  echo "  4. Type: /start"
   echo ""
   echo -e "  ${DIM}Or skip /start and just tell Claude what to build:${RESET}"
   echo "  \"I want to build [your idea]. Help me create a plan.\""
@@ -1522,12 +2139,19 @@ main() {
 
   step_project_basics
   step_language
+  step_archetype
   step_permissions
   step_ralph
   step_docker
   step_planning
   step_git_remote
   step_github_pm
+
+  # Dry-run: show preview and exit without writing anything
+  if [[ "$DRY_RUN" == true ]]; then
+    dry_run_report
+    exit 0
+  fi
 
   apply_templates
   cleanup_artifacts

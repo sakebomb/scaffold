@@ -68,6 +68,13 @@ Running `./scaffold` walks you through an interactive setup:
   4) rust      — cargo test, clippy
   5) none      — language-agnostic (configure later)
 
+═══ Project Archetype ═══
+? Select project archetype:
+  1) none      — blank project (just language tooling)
+  2) cli       — command-line tool with argument parsing
+  3) api       — web API with routes and health check
+  4) library   — reusable library with public API
+
 ═══ Claude Code Permissions ═══
 ? Auto-approve git commit? [Y/n]: y
 ? Auto-approve git push? [y/N]: n
@@ -102,7 +109,15 @@ For automation or CI:
 ./scaffold --non-interactive
 ```
 
-Defaults: directory name as project name, python language, safe permissions only, no Ralph Wiggum, blank plan template.
+Defaults: directory name as project name, python language, no archetype, safe permissions only, no Ralph Wiggum, blank plan template.
+
+### Dry Run
+
+Preview what scaffold would create without writing anything:
+
+```bash
+./scaffold --non-interactive --dry-run
+```
 
 ### Keeping Scaffold Artifacts
 
@@ -308,6 +323,7 @@ Language-aware with auto-detection (Cargo.toml, go.mod, tsconfig.json, pyproject
 | `make typecheck` | Run type checker |
 | `make build` | Compile/build |
 | `make check` | lint + typecheck + test (pre-PR gate) |
+| `make setup` | Bootstrap dev environment (deps + pre-commit) |
 | `make setup-github` | Create issue labels (requires `gh` CLI) |
 
 ### GitHub Project Management
@@ -367,6 +383,19 @@ This compares your `.claude/skills/`, `.claude/hooks/`, and `agents/` against th
 | Rust | clippy | rustfmt | (built-in) | cargo test | Cargo.toml |
 | None | — | — | — | — | (configure manually later) |
 
+## Project Archetypes
+
+After selecting a language, scaffold asks for a project archetype that generates deeper structure:
+
+| Archetype | What It Generates |
+|-----------|------------------|
+| **CLI** | Entry point with argument parsing and subcommand structure |
+| **API** | HTTP server with routes directory and health check endpoint |
+| **Library** | Public module with exported functions, ready for distribution |
+| **None** | Blank project with language tooling only (default) |
+
+Each archetype is language-aware — a Python API uses stdlib `http.server`, a Go API uses `net/http`, a Rust CLI uses `std::env`, etc. No framework dependencies are added by default.
+
 ## Contributing
 
 ### How to Contribute
@@ -389,7 +418,7 @@ This compares your `.claude/skills/`, `.claude/hooks/`, and `agents/` against th
 ### Running Tests
 
 ```bash
-# All tests (7 suites, 347 assertions)
+# All tests (12 suites, 614 assertions)
 bash tests/test_scaffold.sh
 
 # Single language
@@ -418,7 +447,7 @@ scaffold/
 ├── agents/                     # Agent specifications
 ├── tasks/                      # Plan, lessons, test registry
 ├── tests/
-│   └── test_scaffold.sh        # Behavior tests (317 assertions)
+│   └── test_scaffold.sh        # Behavior tests (614 assertions)
 └── CLAUDE.md                   # Agent constitution (with placeholders)
 ```
 

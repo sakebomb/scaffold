@@ -162,6 +162,16 @@ step_language() {\\
 }" "$WORK_DIR/scaffold"
 }
 
+# Override the archetype selection in the scaffold script for testing
+force_archetype() {
+  local arch="$1"
+  sed -i "/^step_archetype() {$/,/^}$/c\\
+step_archetype() {\\
+  ARCHETYPE=\"$arch\"\\
+  success \"Archetype: $arch\"\\
+}" "$WORK_DIR/scaffold"
+}
+
 # ---------------------------------------------------------------------------
 # Test: Common structure (shared by all languages)
 # ---------------------------------------------------------------------------
@@ -269,6 +279,7 @@ test_python() {
   assert_file_contains "CLAUDE.md" "Python Conventions" "CLAUDE.md should contain Python conventions"
   assert_file_not_contains "pyproject.toml" "{{PROJECT_NAME}}" "pyproject.toml should not contain placeholder"
   assert_file_contains ".gitignore" "__pycache__" ".gitignore should contain Python entries"
+  assert_file_contains "Makefile" "setup:" "Makefile should contain setup target"
 
   # Should NOT have other language files
   assert_file_absent "package.json"
@@ -430,6 +441,232 @@ test_permissions() {
 }
 
 # ---------------------------------------------------------------------------
+# Test: Python + API archetype
+# ---------------------------------------------------------------------------
+test_python_api() {
+  echo -e "\n${BOLD}Test: Python + API archetype${RESET}"
+  setup_test "python-api"
+  force_archetype "api"
+  run_scaffold > /dev/null
+
+  assert_common_structure
+
+  # Python base files
+  assert_file_exists "pyproject.toml"
+  assert_file_exists "ruff.toml"
+  assert_file_exists "conftest.py"
+  assert_dir_exists "src"
+
+  # API-specific files (package dir name includes random suffix, use glob)
+  TOTAL=$((TOTAL + 1))
+  if compgen -G "$WORK_DIR/src/*/app.py" > /dev/null 2>&1; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1))
+    echo -e "  ${RED}FAIL${RESET} API app.py should exist in src/<pkg>/"
+  fi
+
+  TOTAL=$((TOTAL + 1))
+  if compgen -G "$WORK_DIR/src/*/routes/health.py" > /dev/null 2>&1; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1))
+    echo -e "  ${RED}FAIL${RESET} API health route should exist in src/<pkg>/routes/"
+  fi
+
+  TOTAL=$((TOTAL + 1))
+  if grep -rq "create_app" "$WORK_DIR/src/"/*/app.py 2>/dev/null; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1))
+    echo -e "  ${RED}FAIL${RESET} app.py should contain create_app"
+  fi
+
+  TOTAL=$((TOTAL + 1))
+  if grep -rq "HealthHandler" "$WORK_DIR/src/"/*/routes/health.py 2>/dev/null; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1))
+    echo -e "  ${RED}FAIL${RESET} health.py should contain HealthHandler"
+  fi
+
+  # Should NOT have CLI files
+  TOTAL=$((TOTAL + 1))
+  if ! compgen -G "$WORK_DIR/src/*/cli.py" > /dev/null 2>&1; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1))
+    echo -e "  ${RED}FAIL${RESET} CLI cli.py should not exist for API archetype"
+  fi
+
+  teardown_test
+  echo -e "  ${GREEN}Python + API: done${RESET}"
+}
+
+# ---------------------------------------------------------------------------
+# Test: TypeScript + CLI archetype
+# ---------------------------------------------------------------------------
+test_typescript_cli() {
+  echo -e "\n${BOLD}Test: TypeScript + CLI archetype${RESET}"
+  setup_test "ts-cli"
+  force_language "typescript"
+  force_archetype "cli"
+  run_scaffold > /dev/null
+
+  assert_common_structure
+
+  # TypeScript base files
+  assert_file_exists "package.json"
+  assert_file_exists "tsconfig.json"
+  assert_file_exists "eslint.config.mjs"
+
+  # CLI-specific files
+  assert_file_exists "src/cli.ts" "CLI entry point should exist"
+  assert_file_contains "src/cli.ts" "parseArgs" "cli.ts should contain parseArgs"
+
+  # Should NOT have API or library files
+  assert_file_absent "src/app.ts"
+  assert_file_absent "src/routes"
+
+  teardown_test
+  echo -e "  ${GREEN}TypeScript + CLI: done${RESET}"
+}
+
+# ---------------------------------------------------------------------------
+# Test: Go + library archetype
+# ---------------------------------------------------------------------------
+test_go_library() {
+  echo -e "\n${BOLD}Test: Go + library archetype${RESET}"
+  setup_test "go-lib"
+  force_language "go"
+  force_archetype "library"
+  run_scaffold > /dev/null
+
+  assert_common_structure
+
+  # Go base files
+  assert_file_exists "go.mod"
+
+  # Library-specific files (filename includes project name with random suffix)
+  TOTAL=$((TOTAL + 1))
+  if compgen -G "$WORK_DIR/scaffold_test_go_lib_*.go" > /dev/null 2>&1; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1))
+    echo -e "  ${RED}FAIL${RESET} Go library .go file should exist at root"
+  fi
+
+  TOTAL=$((TOTAL + 1))
+  if grep -rq "func Hello" "$WORK_DIR"/scaffold_test_go_lib_*.go 2>/dev/null; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1))
+    echo -e "  ${RED}FAIL${RESET} library should contain exported Hello function"
+  fi
+
+  # Should NOT have cmd directory (library, not binary)
+  assert_file_absent "cmd"
+
+  teardown_test
+  echo -e "  ${GREEN}Go + library: done${RESET}"
+}
+
+# ---------------------------------------------------------------------------
+# Test: Rust + library archetype
+# ---------------------------------------------------------------------------
+test_rust_library() {
+  echo -e "\n${BOLD}Test: Rust + library archetype${RESET}"
+  setup_test "rust-lib"
+  force_language "rust"
+  force_archetype "library"
+  run_scaffold > /dev/null
+
+  assert_common_structure
+
+  # Rust base files
+  assert_file_exists "Cargo.toml"
+
+  # Library-specific files
+  assert_file_exists "src/lib.rs" "Rust lib.rs should exist"
+  assert_file_contains "src/lib.rs" "pub fn hello" "lib.rs should contain pub fn hello"
+
+  # Should NOT have main.rs (library, not binary)
+  assert_file_absent "src/main.rs"
+
+  teardown_test
+  echo -e "  ${GREEN}Rust + library: done${RESET}"
+}
+
+# ---------------------------------------------------------------------------
+# Test: --dry-run produces no files
+# ---------------------------------------------------------------------------
+test_dry_run() {
+  echo -e "\n${BOLD}Test: --dry-run flag${RESET}"
+  setup_test "dryrun"
+
+  local output
+  output="$(cd "$WORK_DIR" && ./scaffold --non-interactive --dry-run 2>&1)"
+  cd "$SCRIPT_DIR"
+
+  # Should NOT have created any project files (CLAUDE.md gets customized by apply_templates)
+  # The original CLAUDE.md from the repo copy still exists, but .git should NOT be initialized
+  TOTAL=$((TOTAL + 1))
+  if [[ ! -d "$WORK_DIR/.git" ]]; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1))
+    echo -e "  ${RED}FAIL${RESET} --dry-run should not initialize git"
+  fi
+
+  # Should NOT have generated a project README (apply_templates replaces it)
+  # Check that the original README still exists (from repo copy) and wasn't replaced
+  TOTAL=$((TOTAL + 1))
+  if ! grep -q "^# scaffold-test-dryrun" "$WORK_DIR/README.md" 2>/dev/null; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1))
+    echo -e "  ${RED}FAIL${RESET} --dry-run should not generate project README"
+  fi
+
+  # Output should contain the dry-run preview
+  TOTAL=$((TOTAL + 1))
+  if echo "$output" | grep -q "Dry Run Preview"; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1))
+    echo -e "  ${RED}FAIL${RESET} --dry-run should print 'Dry Run Preview'"
+  fi
+
+  TOTAL=$((TOTAL + 1))
+  if echo "$output" | grep -q "No files were written"; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1))
+    echo -e "  ${RED}FAIL${RESET} --dry-run should print 'No files were written'"
+  fi
+
+  # Output should list expected files
+  TOTAL=$((TOTAL + 1))
+  if echo "$output" | grep -q "CLAUDE.md"; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1))
+    echo -e "  ${RED}FAIL${RESET} --dry-run should list CLAUDE.md in preview"
+  fi
+
+  TOTAL=$((TOTAL + 1))
+  if echo "$output" | grep -q "pyproject.toml"; then
+    PASS=$((PASS + 1))
+  else
+    FAIL=$((FAIL + 1))
+    echo -e "  ${RED}FAIL${RESET} --dry-run should list pyproject.toml for python default"
+  fi
+
+  teardown_test
+  echo -e "  ${GREEN}--dry-run: done${RESET}"
+}
+
+# ---------------------------------------------------------------------------
 # Main
 # ---------------------------------------------------------------------------
 main() {
@@ -443,8 +680,19 @@ main() {
     go)         test_go ;;
     rust)       test_rust ;;
     none)       test_none ;;
-    keep)       test_keep_flag ;;
-    permissions) test_permissions ;;
+    keep)           test_keep_flag ;;
+    dry-run)        test_dry_run ;;
+    permissions)    test_permissions ;;
+    python-api)     test_python_api ;;
+    ts-cli)         test_typescript_cli ;;
+    go-library)     test_go_library ;;
+    rust-library)   test_rust_library ;;
+    archetypes)
+      test_python_api
+      test_typescript_cli
+      test_go_library
+      test_rust_library
+      ;;
     all)
       test_python
       test_typescript
@@ -452,11 +700,16 @@ main() {
       test_rust
       test_none
       test_keep_flag
+      test_dry_run
       test_permissions
+      test_python_api
+      test_typescript_cli
+      test_go_library
+      test_rust_library
       ;;
     *)
       echo "Unknown test: $filter"
-      echo "Usage: $0 [python|typescript|go|rust|none|keep|permissions|all]"
+      echo "Usage: $0 [python|typescript|go|rust|none|keep|dry-run|permissions|python-api|ts-cli|go-library|rust-library|archetypes|all]"
       exit 1
       ;;
   esac

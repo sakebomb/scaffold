@@ -1,49 +1,47 @@
-# Task Plan — Project Hardening (CI, Safety, DevEx, Docker, Updates, Releases)
+# Task Plan — P1 Features: --dry-run, make setup, Project Archetypes
 
 > Updated: 2026-02-13
-> Branch: `feat/project-hardening`
+> Branch: `feat/p1-features`
 > Status: Complete
+> Issues: #8, #9, #10
 
 ## Objective
 
-Add 9 features that harden scaffolded projects for real-world use: CI workflows, pre-commit hooks, secret scanning, health checks, environment templates, Docker support, an update mechanism, and a release workflow.
+Implement the three P1-high features: `--dry-run` preview mode, `make setup` bootstrap target, and project archetypes (CLI, API, library).
 
 ## Plan
 
-### Phase 1: CI Workflows — items #1, #4
-- [x] 1. Create `.github/workflows/ci.yml` for scaffold repo itself
-- [x] 2. Add CI template generation to scaffold — per-language setup
-- [x] 3. Add test assertions for generated CI workflow
+### Phase 1: `--dry-run` flag (#10)
 
-### Phase 2: Pre-commit + Secret Scanning — items #2, #3
-- [x] 4. Create per-language `.pre-commit-config.yaml` generation
-- [x] 5. Add secret scanning via `detect-secrets` pre-commit hook
-- [x] 6. Add test assertions for pre-commit config
+- [x] 1. Add `DRY_RUN=false` global
+- [x] 2. Add `--dry-run` to `parse_flags()` and `show_help()`
+- [x] 3. Create `dry_run_report()` — prints file tree of what would be created based on choices
+- [x] 4. In `main()`, after all `step_*` prompts but before `apply_templates`: if `DRY_RUN`, call `dry_run_report` and exit
+- [x] 5. Add test: `./scaffold --non-interactive --dry-run` produces no files, exits 0
+- [x] 6. Update header comment with new flag
 
-### Phase 3: /doctor + .env.example — items #5, #7
-- [x] 7. Create `/doctor` skill
-- [x] 8. Add `.env.example` template generation
-- [x] 9. Add test assertions for /doctor skill and .env.example
-- [x] 10. Update slash command count 12 → 13
+### Phase 2: `make setup` target (#9)
 
-### Phase 4: Docker Support — item #8
-- [x] 11. Add Docker step to scaffold (optional)
-- [x] 12. Create per-language Dockerfile templates (multi-stage where applicable)
-- [x] 13. Create `docker-compose.yml` template
-- [x] 14. Add test assertions for Docker files (Docker is optional — no assertions needed for default)
+- [x] 7. Add per-language `SETUP_CMD` variables to Makefile
+- [x] 8. Add `setup` target: run `SETUP_CMD`, `pre-commit install` if config exists
+- [x] 9. Add `setup` to `.PHONY` list and `help` target
+- [x] 10. Update scaffold's `show_summary()` to mention `make setup`
+- [x] 11. Add test: assert Makefile contains `setup` target
+- [x] 12. Update README "Makefile" section
 
-### Phase 5: Update Mechanism — item #6
-- [x] 15. Add `scaffold --update` flag
-- [x] 16. Update `--help` text with new flag
-- [x] 17. Add safety: show diff, require confirmation
+### Phase 3: Project Archetypes (#8)
 
-### Phase 6: CHANGELOG + Release Workflow — item #9
-- [x] 18. Add `CHANGELOG.md` template generation
-- [x] 19. Create `.github/workflows/release.yml` template
-- [x] 20. Add test assertions
+- [x] 13. Add `ARCHETYPE="none"` global
+- [x] 14. Create `step_archetype()` with options: cli, api, library, none
+- [x] 15. Create `apply_archetype()` with 4 languages × 3 archetypes + default
+- [x] 16. Wire `step_archetype()` into `main()` after `step_language()`
+- [x] 17. Add `force_archetype()` helper in tests
+- [x] 18. Add tests: Python×API, TypeScript×CLI, Go×library, Rust×library
+- [x] 19. Update README with archetype section
+- [x] 20. Update show_help to mention archetypes
 
-### Phase 7: Final Polish
-- [x] 21. Update README.md with all new features
-- [x] 22. Update CLAUDE.md skills table
-- [x] 23. Run full test suite — 347/347 passing
-- [x] 24. Commit, push, PR
+### Phase 4: Final Polish
+
+- [x] 21. Run full test suite — 614/614 passing
+- [x] 22. Update README counts and tests.md
+- [x] 23. Commit, push, PR
