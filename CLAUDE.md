@@ -207,6 +207,7 @@ The following slash commands are available via `.claude/skills/`:
 
 | Command | Purpose |
 |---------|---------|
+| `/start` | Guided first-session onboarding — plan your project and create your first issue |
 | `/plan <task>` | Create a structured plan with confidence assessment in `tasks/todo.md` |
 | `/review [scope]` | Review code changes with Four Questions validation |
 | `/test [tier]` | Run tests, analyze failures, propose fixes |
