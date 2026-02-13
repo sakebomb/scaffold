@@ -129,7 +129,7 @@ rollback_on_failure() {
 
   local answer="n"
   read -rp "Roll back created files? [y/N]: " answer
-  if [[ "${answer,,}" == "y" || "${answer,,}" == "yes" ]]; then
+  if [[ "$(to_lower "$answer")" == "y" || "$(to_lower "$answer")" == "yes" ]]; then
     perform_rollback "$new_files"
   else
     warn "Partial files left in place. Review manually."
@@ -153,6 +153,11 @@ perform_rollback() {
     fi
   done
   success "Rolled back created files."
+}
+
+# Lowercase a string (bash 3.2 compatible — avoids ${var,,})
+to_lower() {
+  printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
 }
 
 # Escape string for use as sed replacement (handles /, &, \, newlines)
@@ -193,7 +198,7 @@ prompt_yn() {
   local var_name="$1" prompt_text="$2" default="$3"
   if [[ "$NON_INTERACTIVE" == true ]]; then
     # Keep value from .scaffoldrc if it was explicitly set
-    if [[ -z "${_RC_SET[$var_name]:-}" ]]; then
+    if [[ "$_RC_KEYS" != *":${var_name}:"* ]]; then
       printf -v "$var_name" '%s' "$default"
     fi
     return
@@ -204,7 +209,7 @@ prompt_yn() {
   echo -ne "${CYAN}?${RESET} ${prompt_text} ${DIM}[$yn_hint]${RESET}: "
   local input
   read -r input
-  case "${input,,}" in
+  case "$(to_lower "$input")" in
     y|yes) printf -v "$var_name" '%s' "true" ;;
     n|no)  printf -v "$var_name" '%s' "false" ;;
     *)     printf -v "$var_name" '%s' "$default" ;;
@@ -218,7 +223,7 @@ prompt_choice() {
 
   if [[ "$NON_INTERACTIVE" == true ]]; then
     # Keep value from .scaffoldrc if it was explicitly set
-    if [[ -z "${_RC_SET[$var_name]:-}" ]]; then
+    if [[ "$_RC_KEYS" != *":${var_name}:"* ]]; then
       printf -v "$var_name" '%s' "${options[0]}"
     fi
     return
@@ -423,7 +428,7 @@ ZCOMP
 # .scaffoldrc — persistent user defaults
 # ---------------------------------------------------------------------------
 # Track which variables were set by .scaffoldrc
-declare -A _RC_SET=()
+_RC_KEYS=""
 
 load_scaffoldrc() {
   local rc_file="${SCAFFOLDRC:-$HOME/.scaffoldrc}"
@@ -437,16 +442,16 @@ load_scaffoldrc() {
     key="$(echo "$key" | xargs)"
     value="$(echo "$value" | xargs)"
     case "$key" in
-      LANGUAGE)           LANGUAGE="$value"; _RC_SET[LANGUAGE]=1 ;;
-      ARCHETYPE)          ARCHETYPE="$value"; _RC_SET[ARCHETYPE]=1 ;;
-      ENABLE_DOCKER)      ENABLE_DOCKER="$value"; _RC_SET[ENABLE_DOCKER]=1 ;;
-      ENABLE_VSCODE)      ENABLE_VSCODE="$value"; _RC_SET[ENABLE_VSCODE]=1 ;;
-      ENABLE_RALPH)       ENABLE_RALPH="$value"; _RC_SET[ENABLE_RALPH]=1 ;;
-      ALLOW_COMMIT)       ALLOW_COMMIT="$value"; _RC_SET[ALLOW_COMMIT]=1 ;;
-      ALLOW_PUSH)         ALLOW_PUSH="$value"; _RC_SET[ALLOW_PUSH]=1 ;;
-      ALLOW_PKG_MANAGER)  ALLOW_PKG_MANAGER="$value"; _RC_SET[ALLOW_PKG_MANAGER]=1 ;;
-      ALLOW_DOCKER)       ALLOW_DOCKER="$value"; _RC_SET[ALLOW_DOCKER]=1 ;;
-      KEEP_ARTIFACTS)     KEEP_ARTIFACTS="$value"; _RC_SET[KEEP_ARTIFACTS]=1 ;;
+      LANGUAGE)           LANGUAGE="$value"; _RC_KEYS="${_RC_KEYS}:LANGUAGE:" ;;
+      ARCHETYPE)          ARCHETYPE="$value"; _RC_KEYS="${_RC_KEYS}:ARCHETYPE:" ;;
+      ENABLE_DOCKER)      ENABLE_DOCKER="$value"; _RC_KEYS="${_RC_KEYS}:ENABLE_DOCKER:" ;;
+      ENABLE_VSCODE)      ENABLE_VSCODE="$value"; _RC_KEYS="${_RC_KEYS}:ENABLE_VSCODE:" ;;
+      ENABLE_RALPH)       ENABLE_RALPH="$value"; _RC_KEYS="${_RC_KEYS}:ENABLE_RALPH:" ;;
+      ALLOW_COMMIT)       ALLOW_COMMIT="$value"; _RC_KEYS="${_RC_KEYS}:ALLOW_COMMIT:" ;;
+      ALLOW_PUSH)         ALLOW_PUSH="$value"; _RC_KEYS="${_RC_KEYS}:ALLOW_PUSH:" ;;
+      ALLOW_PKG_MANAGER)  ALLOW_PKG_MANAGER="$value"; _RC_KEYS="${_RC_KEYS}:ALLOW_PKG_MANAGER:" ;;
+      ALLOW_DOCKER)       ALLOW_DOCKER="$value"; _RC_KEYS="${_RC_KEYS}:ALLOW_DOCKER:" ;;
+      KEEP_ARTIFACTS)     KEEP_ARTIFACTS="$value"; _RC_KEYS="${_RC_KEYS}:KEEP_ARTIFACTS:" ;;
       *) ;; # ignore unknown keys
     esac
   done < "$rc_file"
@@ -3219,7 +3224,7 @@ run_verify() {
   # Check 5: No leftover placeholders in project files
   checks=$((checks + 1))
   local placeholder_files
-  placeholder_files=$(grep -rl '{{PROJECT_NAME}}\|{{PROJECT_DESCRIPTION}}' --include='*.md' --include='*.json' --include='*.toml' --include='*.yaml' --include='*.yml' . 2>/dev/null | grep -v -e '.git/' -e 'templates/' -e 'scratch/' -e 'scaffold' || true)
+  placeholder_files=$(grep -rl '{{PROJECT_NAME}}\|{{PROJECT_DESCRIPTION}}' --include='*.md' --include='*.json' --include='*.toml' --include='*.yaml' --include='*.yml' . 2>/dev/null | grep -v -e '.git/' -e 'templates/' -e 'scratch/' -e 'scaffold' -e 'docs/' || true)
   if [[ -z "$placeholder_files" ]]; then
     echo -e "  ${GREEN}PASS${RESET} No leftover {{placeholders}} found"
     passed=$((passed + 1))
@@ -3402,8 +3407,10 @@ main() {
   # --add mode: layer a second language and exit
   if [[ "$ADD_MODE" == true ]]; then
     if [[ -z "$ADD_LANGUAGE" ]]; then
-      local available_langs
-      mapfile -t available_langs < <(list_available_languages)
+      local available_langs=()
+      while IFS= read -r _lang; do
+        available_langs+=("$_lang")
+      done < <(list_available_languages)
       prompt_choice ADD_LANGUAGE "Select language to add:" "${available_langs[@]}"
     fi
     run_add_language
