@@ -155,15 +155,20 @@ teardown_test() {
   fi
 }
 
-run_scaffold() {
+run_scaffold_cmd() {
+  # Run scaffold with any args, surface errors to stderr on failure
   local output exit_code=0
-  output=$(cd "$WORK_DIR" && ./scaffold --non-interactive 2>&1) || exit_code=$?
+  output=$(cd "$WORK_DIR" && ./scaffold "$@" 2>&1) || exit_code=$?
   if [[ $exit_code -ne 0 ]]; then
-    echo "  SCAFFOLD FAILED (exit $exit_code):" >&2
+    echo "  SCAFFOLD FAILED (exit $exit_code, args: $*):" >&2
     echo "$output" | tail -30 >&2
     return $exit_code
   fi
   cd "$SCRIPT_DIR"
+}
+
+run_scaffold() {
+  run_scaffold_cmd --non-interactive
 }
 
 # Override the language selection in the scaffold script for testing
@@ -430,7 +435,7 @@ test_keep_flag() {
   echo -e "\n${BOLD}Test: --keep flag${RESET}"
   setup_test "keep"
 
-  cd "$WORK_DIR" && ./scaffold --non-interactive --keep > /dev/null 2>&1
+  run_scaffold_cmd --non-interactive --keep
   cd "$SCRIPT_DIR"
 
   assert_file_exists "scaffold" "scaffold script should be preserved with --keep"
@@ -827,7 +832,7 @@ test_add_language() {
   setup_test "add-lang"
 
   # First: scaffold a python project with --keep (so templates remain)
-  cd "$WORK_DIR" && ./scaffold --non-interactive --keep > /dev/null 2>&1
+  run_scaffold_cmd --non-interactive --keep
   cd "$SCRIPT_DIR"
 
   # Verify it's a python project first
@@ -840,7 +845,7 @@ test_add_language() {
   fi
 
   # Now add typescript
-  cd "$WORK_DIR" && ./scaffold --add typescript > /dev/null 2>&1
+  run_scaffold_cmd --add typescript
   cd "$SCRIPT_DIR"
 
   # Should have TypeScript config files
@@ -946,7 +951,7 @@ test_add_language() {
   fi
 
   # Running --add again should not duplicate
-  cd "$WORK_DIR" && ./scaffold --add typescript > /dev/null 2>&1
+  run_scaffold_cmd --add typescript
   cd "$SCRIPT_DIR"
 
   TOTAL=$((TOTAL + 1))
@@ -1034,7 +1039,7 @@ EOF
   git -C "$WORK_DIR" commit -m "initial" > /dev/null 2>&1
 
   # Run migrate
-  cd "$WORK_DIR" && ./scaffold --migrate --non-interactive > /dev/null 2>&1
+  run_scaffold_cmd --migrate --non-interactive
   cd "$SCRIPT_DIR"
 
   # Should have detected Python
@@ -1154,8 +1159,8 @@ EOF
   git -C "$WORK_DIR" commit -m "initial" > /dev/null 2>&1
 
   # Run migrate twice
-  cd "$WORK_DIR" && ./scaffold --migrate --non-interactive > /dev/null 2>&1
-  cd "$WORK_DIR" && ./scaffold --migrate --non-interactive > /dev/null 2>&1
+  run_scaffold_cmd --migrate --non-interactive
+  run_scaffold_cmd --migrate --non-interactive
   cd "$SCRIPT_DIR"
 
   # CLAUDE.md should have Python conventions exactly once
@@ -1372,7 +1377,7 @@ test_add_dir() {
   run_scaffold > /dev/null
 
   # Now add Python in a subdirectory
-  (cd "$WORK_DIR" && ./scaffold --add python --dir backend 2>&1) > /dev/null
+  run_scaffold_cmd --add python --dir backend
 
   # Config files should be in backend/
   TOTAL=$((TOTAL + 1))
@@ -1602,7 +1607,7 @@ test_add_interactive() {
 
   # First: scaffold a Go project with --keep
   force_language "go"
-  cd "$WORK_DIR" && ./scaffold --non-interactive --keep > /dev/null 2>&1
+  run_scaffold_cmd --non-interactive --keep
   cd "$SCRIPT_DIR"
 
   # Verify it's a Go project
@@ -1615,7 +1620,7 @@ test_add_interactive() {
   fi
 
   # Now use --add without language arg in non-interactive mode → defaults to python
-  cd "$WORK_DIR" && ./scaffold --add --non-interactive > /dev/null 2>&1
+  run_scaffold_cmd --add --non-interactive
   cd "$SCRIPT_DIR"
 
   TOTAL=$((TOTAL + 1))
@@ -1646,7 +1651,7 @@ test_add_explicit() {
   setup_test "add-explicit"
 
   # Scaffold a python project with --keep
-  cd "$WORK_DIR" && ./scaffold --non-interactive --keep > /dev/null 2>&1
+  run_scaffold_cmd --non-interactive --keep
   cd "$SCRIPT_DIR"
 
   TOTAL=$((TOTAL + 1))
@@ -1658,7 +1663,7 @@ test_add_explicit() {
   fi
 
   # Add go explicitly
-  cd "$WORK_DIR" && ./scaffold --add go > /dev/null 2>&1
+  run_scaffold_cmd --add go
   cd "$SCRIPT_DIR"
 
   TOTAL=$((TOTAL + 1))
@@ -1680,7 +1685,7 @@ test_verify_pass() {
   setup_test "verify-pass"
 
   # Scaffold a project
-  cd "$WORK_DIR" && ./scaffold --non-interactive --keep > /dev/null 2>&1
+  run_scaffold_cmd --non-interactive --keep
   cd "$SCRIPT_DIR"
 
   # Run --verify
@@ -1735,7 +1740,7 @@ test_verify_fail() {
   setup_test "verify-fail"
 
   # Scaffold a project
-  cd "$WORK_DIR" && ./scaffold --non-interactive --keep > /dev/null 2>&1
+  run_scaffold_cmd --non-interactive --keep
   cd "$SCRIPT_DIR"
 
   # Inject a leftover placeholder
