@@ -156,7 +156,13 @@ teardown_test() {
 }
 
 run_scaffold() {
-  cd "$WORK_DIR" && ./scaffold --non-interactive 2>&1
+  local output exit_code=0
+  output=$(cd "$WORK_DIR" && ./scaffold --non-interactive 2>&1) || exit_code=$?
+  if [[ $exit_code -ne 0 ]]; then
+    echo "  SCAFFOLD FAILED (exit $exit_code):" >&2
+    echo "$output" | tail -30 >&2
+    return $exit_code
+  fi
   cd "$SCRIPT_DIR"
 }
 
