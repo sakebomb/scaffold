@@ -12,7 +12,7 @@ Scaffolding solves this by giving Claude Code the right context from the very fi
 
 - **An agent constitution** (`CLAUDE.md`) that defines guardrails, planning workflow, testing tiers, subagent delegation, and recovery patterns — so Claude operates with senior-engineer standards instead of guessing.
 - **Pre-configured permissions** (`.claude/settings.json`) with a tiered model — safe operations auto-approved, destructive operations always gated, and middle-ground operations that you decide during init.
-- **12 slash commands** (`/plan`, `/review`, `/test`, `/lesson`, `/checkpoint`, `/status`, `/simplify`, `/index`, `/save`, `/load`, `/backlog`) so common workflows are one command away.
+- **12 slash commands** (`/start`, `/plan`, `/review`, `/test`, `/lesson`, `/checkpoint`, `/status`, `/simplify`, `/index`, `/save`, `/load`, `/backlog`) so common workflows are one command away.
 - **8 agent specifications** for subagent delegation — Plan, Research, Code Review, Test Runner, Build Validator, Code Architect, Code Simplifier, and Verify — each with defined context budgets and output contracts.
 - **A lessons-learned system** (`tasks/lessons.md`) that accumulates across sessions, so mistakes compound into preventive rules instead of being forgotten.
 - **Language-specific conventions** for Python, TypeScript, Go, and Rust that get appended to `CLAUDE.md` during init — best practices, linter configs, project structure, and testing patterns.
@@ -85,6 +85,11 @@ Running `./scaffold` walks you through an interactive setup:
 
 ═══ Git Remote (Optional) ═══
 ? Git remote URL (leave blank to skip):
+
+═══ GitHub Project Management ═══
+Issue templates and PR template are included in .github/
+? Create issue labels (type, priority, status)? [Y/n]: y
+? Create a GitHub Projects kanban board? [y/N]: n
 ```
 
 After completing the flow, scaffold applies your choices, cleans up its own files, initializes git, and creates the first commit.
@@ -192,6 +197,16 @@ The core of the framework. Defines how Claude Code should behave in your project
 - **Recovery** — lessons learned system that compounds across sessions
 
 Language-specific conventions (Python, TypeScript, Go, Rust) are appended during init — covering linting, testing, project structure, and idiomatic patterns.
+
+### First Session Onboarding
+
+New to Claude Code? After running `./scaffold`:
+
+1. Run `claude` to start Claude Code
+2. Type `/start` — a guided walkthrough that helps you create your first plan and (optionally) your first GitHub issue
+3. Or just tell Claude what to build: *"I want to build [your idea]. Help me create a plan."*
+
+A `GETTING_STARTED.md` file is also generated in your project with a full walkthrough, example prompts, and a command reference.
 
 ### Slash Commands
 
@@ -354,12 +369,13 @@ scaffolding/
 ├── templates/                  # Language templates + Ralph Wiggum
 ├── .claude/                    # Claude Code configuration
 │   ├── settings.json           # Permission tiers
-│   ├── skills/                 # Slash command definitions
+│   ├── skills/                 # Slash command definitions (12 commands)
 │   └── hooks/                  # Git safety hooks
+├── .github/                    # Issue templates + PR template
 ├── agents/                     # Agent specifications
 ├── tasks/                      # Plan, lessons, test registry
 ├── tests/
-│   └── test_scaffold.sh        # Behavior tests
+│   └── test_scaffold.sh        # Behavior tests (317 assertions)
 └── CLAUDE.md                   # Agent constitution (with placeholders)
 ```
 
