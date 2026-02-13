@@ -14,6 +14,15 @@
 # =============================================================================
 set -euo pipefail
 
+# Portable sed in-place edit (BSD sed requires -i '', GNU sed uses -i)
+sed_inplace() {
+  if sed --version >/dev/null 2>&1; then
+    sed -i "$@"
+  else
+    sed -i '' "$@"
+  fi
+}
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PASS=0
 FAIL=0
@@ -155,7 +164,7 @@ run_scaffold() {
 force_language() {
   local lang="$1"
   # Replace the step_language function body with a direct assignment
-  sed -i "/^step_language() {$/,/^}$/c\\
+  sed_inplace "/^step_language() {$/,/^}$/c\\
 step_language() {\\
   LANGUAGE=\"$lang\"\\
   success \"Language: $lang\"\\
@@ -165,7 +174,7 @@ step_language() {\\
 # Override the archetype selection in the scaffold script for testing
 force_archetype() {
   local arch="$1"
-  sed -i "/^step_archetype() {$/,/^}$/c\\
+  sed_inplace "/^step_archetype() {$/,/^}$/c\\
 step_archetype() {\\
   ARCHETYPE=\"$arch\"\\
   success \"Archetype: $arch\"\\
@@ -756,7 +765,7 @@ test_rollback() {
 
   # Inject a failure into apply_templates to trigger rollback
   # We'll add a failing command right after SECURITY.md generation
-  sed -i '/success "SECURITY.md generated"/a\
+  sed_inplace '/success "SECURITY.md generated"/a\
   false  # Injected failure for rollback test' "$WORK_DIR/scaffold"
 
   # Run scaffold (it should fail and auto-rollback in non-interactive mode)
@@ -1353,7 +1362,7 @@ test_add_dir() {
   # First scaffold a base TypeScript project with --keep (needed for --add)
   force_language "typescript"
   # Inject --keep so scaffold + templates are preserved
-  sed -i 's/KEEP_ARTIFACTS=false/KEEP_ARTIFACTS=true/' "$WORK_DIR/scaffold"
+  sed_inplace 's/KEEP_ARTIFACTS=false/KEEP_ARTIFACTS=true/' "$WORK_DIR/scaffold"
   run_scaffold > /dev/null
 
   # Now add Python in a subdirectory

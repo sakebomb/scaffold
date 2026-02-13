@@ -160,6 +160,15 @@ to_lower() {
   printf '%s' "$1" | tr '[:upper:]' '[:lower:]'
 }
 
+# Portable sed in-place edit (BSD sed requires -i '', GNU sed uses -i)
+sed_inplace() {
+  if sed --version >/dev/null 2>&1; then
+    sed -i "$@"
+  else
+    sed -i '' "$@"
+  fi
+}
+
 # Escape string for use as sed replacement (handles /, &, \, newlines)
 sed_escape() {
   printf '%s' "$1" | sed -e 's/[\/&\\]/\\&/g'
@@ -171,7 +180,7 @@ replace_placeholders() {
   local escaped_name escaped_desc
   escaped_name="$(sed_escape "$PROJECT_NAME")"
   escaped_desc="$(sed_escape "$PROJECT_DESC")"
-  sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g; s/{{PROJECT_DESCRIPTION}}/${escaped_desc}/g" "$file"
+  sed_inplace "s/{{PROJECT_NAME}}/${escaped_name}/g; s/{{PROJECT_DESCRIPTION}}/${escaped_desc}/g" "$file"
 }
 
 prompt() {
@@ -1256,8 +1265,8 @@ def main(argv: list[str] | None = None) -> None:
     if args.command == "run":
         print(f"Running with target: {args.target}")
 PYEOF
-          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/$pkg_name/cli.py"
-          sed -i "s/{{PROJECT_DESC}}/${PROJECT_DESC//\//\\/}/g" "$SCRIPT_DIR/src/$pkg_name/cli.py"
+          sed_inplace "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/$pkg_name/cli.py"
+          sed_inplace "s/{{PROJECT_DESC}}/${PROJECT_DESC//\//\\/}/g" "$SCRIPT_DIR/src/$pkg_name/cli.py"
           success "  Created CLI archetype: src/$pkg_name/cli.py, __main__.py"
           ;;
         api)
@@ -1311,8 +1320,8 @@ class HealthHandler(BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(json.dumps(body).encode())
 PYEOF
-          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/$pkg_name/app.py"
-          sed -i "s/{{PKG_NAME}}/${pkg_name}/g" "$SCRIPT_DIR/src/$pkg_name/app.py"
+          sed_inplace "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/$pkg_name/app.py"
+          sed_inplace "s/{{PKG_NAME}}/${pkg_name}/g" "$SCRIPT_DIR/src/$pkg_name/app.py"
           success "  Created API archetype: src/$pkg_name/app.py, routes/health.py"
           ;;
         library)
@@ -1324,7 +1333,7 @@ def hello(name: str = "world") -> str:
     """Return a greeting. Replace with your library's public API."""
     return f"Hello, {name}!"
 PYEOF
-          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/$pkg_name/lib.py"
+          sed_inplace "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/$pkg_name/lib.py"
           success "  Created library archetype: src/$pkg_name/lib.py"
           ;;
         *)
@@ -1392,7 +1401,7 @@ function main(): void {
 
 main();
 TSEOF
-          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/cli.ts"
+          sed_inplace "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/cli.ts"
           success "  Created CLI archetype: src/cli.ts"
           ;;
         api)
@@ -1432,7 +1441,7 @@ export function healthHandler(_req: IncomingMessage, res: ServerResponse): void 
   res.end(JSON.stringify({ status: "ok" }));
 }
 TSEOF
-          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/app.ts"
+          sed_inplace "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/app.ts"
           success "  Created API archetype: src/app.ts, src/routes/health.ts"
           ;;
         library)
@@ -1448,7 +1457,7 @@ export function hello(name: string = "world"): string {
   return `Hello, ${name}!`;
 }
 TSEOF
-          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/index.ts"
+          sed_inplace "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/index.ts"
           success "  Created library archetype: src/index.ts"
           ;;
         *)
@@ -1457,7 +1466,7 @@ export function main(): void {
   console.log("Hello from {{PROJECT_NAME}}");
 }
 TSEOF
-          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/index.ts"
+          sed_inplace "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/index.ts"
           success "  Created src/index.ts"
           ;;
       esac
@@ -1505,7 +1514,7 @@ func printUsage() {
 	fmt.Println("  run [target]  Run the main task")
 }
 GOEOF
-          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/cmd/$PROJECT_NAME/main.go"
+          sed_inplace "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/cmd/$PROJECT_NAME/main.go"
           success "  Created CLI archetype: cmd/$PROJECT_NAME/main.go"
           ;;
         api)
@@ -1550,7 +1559,7 @@ func HealthHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(map[string]string{"status": "ok"})
 }
 GOEOF
-          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/cmd/$PROJECT_NAME/main.go"
+          sed_inplace "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/cmd/$PROJECT_NAME/main.go"
           success "  Created API archetype: cmd/$PROJECT_NAME/main.go, internal/routes/health.go"
           ;;
         library)
@@ -1566,7 +1575,7 @@ func Hello(name string) string {
 	return "Hello, " + name + "!"
 }
 GOEOF
-          sed -i "s/{{PKG_NAME}}/${pkg_name}/g" "$SCRIPT_DIR/${pkg_name}.go"
+          sed_inplace "s/{{PKG_NAME}}/${pkg_name}/g" "$SCRIPT_DIR/${pkg_name}.go"
           success "  Created library archetype: ${pkg_name}.go"
           ;;
         *)
@@ -1580,7 +1589,7 @@ func main() {
 	fmt.Println("Hello from {{PROJECT_NAME}}")
 }
 GOEOF
-          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/cmd/$PROJECT_NAME/main.go"
+          sed_inplace "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/cmd/$PROJECT_NAME/main.go"
           success "  Created cmd/$PROJECT_NAME/main.go"
           ;;
       esac
@@ -1625,7 +1634,7 @@ fn print_usage() {
     println!("  run [target]  Run the main task");
 }
 RSEOF
-          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/main.rs"
+          sed_inplace "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/main.rs"
           success "  Created CLI archetype: src/main.rs"
           ;;
         api)
@@ -1648,7 +1657,7 @@ fn main() {
     }
 }
 RSEOF
-          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/main.rs"
+          sed_inplace "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/main.rs"
           success "  Created API archetype: src/main.rs"
           ;;
         library)
@@ -1678,7 +1687,7 @@ mod tests {
     }
 }
 RSEOF
-          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/lib.rs"
+          sed_inplace "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/lib.rs"
           # Remove default main.rs for library archetype
           success "  Created library archetype: src/lib.rs"
           ;;
@@ -1688,7 +1697,7 @@ fn main() {
     println!("Hello from {{PROJECT_NAME}}");
 }
 RSEOF
-          sed -i "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/main.rs"
+          sed_inplace "s/{{PROJECT_NAME}}/${escaped_name}/g" "$SCRIPT_DIR/src/main.rs"
           success "  Created src/main.rs"
           ;;
       esac
@@ -2505,7 +2514,7 @@ apply_permissions() {
     local last_allow
     last_allow=$(grep -n '"Bash(mkdir \*)' "$tmp_settings" | tail -1 | cut -d: -f1)
     if [[ -n "$last_allow" ]]; then
-      sed -i "${last_allow}s|\"Bash(mkdir \*)\"|\"Bash(mkdir *)\",\n      ${additions}|" "$tmp_settings"
+      sed_inplace "${last_allow}s|\"Bash(mkdir \*)\"|\"Bash(mkdir *)\",\n      ${additions}|" "$tmp_settings"
     fi
   fi
 
