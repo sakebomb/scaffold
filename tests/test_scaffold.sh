@@ -14,6 +14,15 @@
 # =============================================================================
 set -euo pipefail
 
+# Portable sed in-place edit (BSD sed requires -i '', GNU sed uses -i)
+sed_inplace() {
+  if sed --version >/dev/null 2>&1; then
+    sed -i "$@"
+  else
+    sed -i '' "$@"
+  fi
+}
+
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 PASS=0
 FAIL=0
@@ -146,16 +155,27 @@ teardown_test() {
   fi
 }
 
-run_scaffold() {
-  cd "$WORK_DIR" && ./scaffold --non-interactive 2>&1
+run_scaffold_cmd() {
+  # Run scaffold with any args, surface errors to stderr on failure
+  local output exit_code=0
+  output=$(cd "$WORK_DIR" && ./scaffold "$@" 2>&1) || exit_code=$?
+  if [[ $exit_code -ne 0 ]]; then
+    echo "  SCAFFOLD FAILED (exit $exit_code, args: $*):" >&2
+    echo "$output" | tail -30 >&2
+    return $exit_code
+  fi
   cd "$SCRIPT_DIR"
+}
+
+run_scaffold() {
+  run_scaffold_cmd --non-interactive
 }
 
 # Override the language selection in the scaffold script for testing
 force_language() {
   local lang="$1"
   # Replace the step_language function body with a direct assignment
-  sed -i "/^step_language() {$/,/^}$/c\\
+  sed_inplace "/^step_language() {$/,/^}$/c\\
 step_language() {\\
   LANGUAGE=\"$lang\"\\
   success \"Language: $lang\"\\
@@ -165,7 +185,7 @@ step_language() {\\
 # Override the archetype selection in the scaffold script for testing
 force_archetype() {
   local arch="$1"
-  sed -i "/^step_archetype() {$/,/^}$/c\\
+  sed_inplace "/^step_archetype() {$/,/^}$/c\\
 step_archetype() {\\
   ARCHETYPE=\"$arch\"\\
   success \"Archetype: $arch\"\\
@@ -415,7 +435,7 @@ test_keep_flag() {
   echo -e "\n${BOLD}Test: --keep flag${RESET}"
   setup_test "keep"
 
-  cd "$WORK_DIR" && ./scaffold --non-interactive --keep > /dev/null 2>&1
+  run_scaffold_cmd --non-interactive --keep
   cd "$SCRIPT_DIR"
 
   assert_file_exists "scaffold" "scaffold script should be preserved with --keep"
@@ -756,7 +776,7 @@ test_rollback() {
 
   # Inject a failure into apply_templates to trigger rollback
   # We'll add a failing command right after SECURITY.md generation
-  sed -i '/success "SECURITY.md generated"/a\
+  sed_inplace '/success "SECURITY.md generated"/a\
   false  # Injected failure for rollback test' "$WORK_DIR/scaffold"
 
   # Run scaffold (it should fail and auto-rollback in non-interactive mode)
@@ -812,7 +832,7 @@ test_add_language() {
   setup_test "add-lang"
 
   # First: scaffold a python project with --keep (so templates remain)
-  cd "$WORK_DIR" && ./scaffold --non-interactive --keep > /dev/null 2>&1
+  run_scaffold_cmd --non-interactive --keep
   cd "$SCRIPT_DIR"
 
   # Verify it's a python project first
@@ -825,7 +845,7 @@ test_add_language() {
   fi
 
   # Now add typescript
-  cd "$WORK_DIR" && ./scaffold --add typescript > /dev/null 2>&1
+  run_scaffold_cmd --add typescript
   cd "$SCRIPT_DIR"
 
   # Should have TypeScript config files
@@ -931,7 +951,7 @@ test_add_language() {
   fi
 
   # Running --add again should not duplicate
-  cd "$WORK_DIR" && ./scaffold --add typescript > /dev/null 2>&1
+  run_scaffold_cmd --add typescript
   cd "$SCRIPT_DIR"
 
   TOTAL=$((TOTAL + 1))
@@ -1019,7 +1039,7 @@ EOF
   git -C "$WORK_DIR" commit -m "initial" > /dev/null 2>&1
 
   # Run migrate
-  cd "$WORK_DIR" && ./scaffold --migrate --non-interactive > /dev/null 2>&1
+  run_scaffold_cmd --migrate --non-interactive
   cd "$SCRIPT_DIR"
 
   # Should have detected Python
@@ -1139,8 +1159,8 @@ EOF
   git -C "$WORK_DIR" commit -m "initial" > /dev/null 2>&1
 
   # Run migrate twice
-  cd "$WORK_DIR" && ./scaffold --migrate --non-interactive > /dev/null 2>&1
-  cd "$WORK_DIR" && ./scaffold --migrate --non-interactive > /dev/null 2>&1
+  run_scaffold_cmd --migrate --non-interactive
+  run_scaffold_cmd --migrate --non-interactive
   cd "$SCRIPT_DIR"
 
   # CLAUDE.md should have Python conventions exactly once
@@ -1353,11 +1373,11 @@ test_add_dir() {
   # First scaffold a base TypeScript project with --keep (needed for --add)
   force_language "typescript"
   # Inject --keep so scaffold + templates are preserved
-  sed -i 's/KEEP_ARTIFACTS=false/KEEP_ARTIFACTS=true/' "$WORK_DIR/scaffold"
+  sed_inplace 's/KEEP_ARTIFACTS=false/KEEP_ARTIFACTS=true/' "$WORK_DIR/scaffold"
   run_scaffold > /dev/null
 
   # Now add Python in a subdirectory
-  (cd "$WORK_DIR" && ./scaffold --add python --dir backend 2>&1) > /dev/null
+  run_scaffold_cmd --add python --dir backend
 
   # Config files should be in backend/
   TOTAL=$((TOTAL + 1))
@@ -1587,7 +1607,7 @@ test_add_interactive() {
 
   # First: scaffold a Go project with --keep
   force_language "go"
-  cd "$WORK_DIR" && ./scaffold --non-interactive --keep > /dev/null 2>&1
+  run_scaffold_cmd --non-interactive --keep
   cd "$SCRIPT_DIR"
 
   # Verify it's a Go project
@@ -1600,7 +1620,7 @@ test_add_interactive() {
   fi
 
   # Now use --add without language arg in non-interactive mode → defaults to python
-  cd "$WORK_DIR" && ./scaffold --add --non-interactive > /dev/null 2>&1
+  run_scaffold_cmd --add --non-interactive
   cd "$SCRIPT_DIR"
 
   TOTAL=$((TOTAL + 1))
@@ -1631,7 +1651,7 @@ test_add_explicit() {
   setup_test "add-explicit"
 
   # Scaffold a python project with --keep
-  cd "$WORK_DIR" && ./scaffold --non-interactive --keep > /dev/null 2>&1
+  run_scaffold_cmd --non-interactive --keep
   cd "$SCRIPT_DIR"
 
   TOTAL=$((TOTAL + 1))
@@ -1643,7 +1663,7 @@ test_add_explicit() {
   fi
 
   # Add go explicitly
-  cd "$WORK_DIR" && ./scaffold --add go > /dev/null 2>&1
+  run_scaffold_cmd --add go
   cd "$SCRIPT_DIR"
 
   TOTAL=$((TOTAL + 1))
@@ -1665,7 +1685,7 @@ test_verify_pass() {
   setup_test "verify-pass"
 
   # Scaffold a project
-  cd "$WORK_DIR" && ./scaffold --non-interactive --keep > /dev/null 2>&1
+  run_scaffold_cmd --non-interactive --keep
   cd "$SCRIPT_DIR"
 
   # Run --verify
@@ -1720,7 +1740,7 @@ test_verify_fail() {
   setup_test "verify-fail"
 
   # Scaffold a project
-  cd "$WORK_DIR" && ./scaffold --non-interactive --keep > /dev/null 2>&1
+  run_scaffold_cmd --non-interactive --keep
   cd "$SCRIPT_DIR"
 
   # Inject a leftover placeholder
