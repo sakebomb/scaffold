@@ -169,6 +169,7 @@ assert_common_structure() {
   # Core files
   assert_file_exists "CLAUDE.md"
   assert_file_exists "README.md"
+  assert_file_exists "GETTING_STARTED.md"
   assert_file_exists "LICENSE"
   assert_file_exists "Makefile"
   assert_file_exists ".gitignore"
@@ -187,6 +188,7 @@ assert_common_structure() {
   assert_file_exists ".claude/skills/save/SKILL.md"
   assert_file_exists ".claude/skills/load/SKILL.md"
   assert_file_exists ".claude/skills/backlog/SKILL.md"
+  assert_file_exists ".claude/skills/start/SKILL.md"
   assert_file_exists ".claude/hooks/protect-main-branch.sh"
 
   # GitHub templates
@@ -235,6 +237,7 @@ assert_common_structure() {
   # Placeholder replacement
   assert_file_not_contains "CLAUDE.md" "{{PROJECT_NAME}}" "CLAUDE.md should not contain {{PROJECT_NAME}} placeholder"
   assert_file_not_contains "CLAUDE.md" "{{PROJECT_DESCRIPTION}}" "CLAUDE.md should not contain {{PROJECT_DESCRIPTION}} placeholder"
+  assert_file_contains "GETTING_STARTED.md" "Getting Started" "GETTING_STARTED.md should contain onboarding content"
 }
 
 # ---------------------------------------------------------------------------

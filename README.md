@@ -12,7 +12,7 @@ Scaffolding solves this by giving Claude Code the right context from the very fi
 
 - **An agent constitution** (`CLAUDE.md`) that defines guardrails, planning workflow, testing tiers, subagent delegation, and recovery patterns — so Claude operates with senior-engineer standards instead of guessing.
 - **Pre-configured permissions** (`.claude/settings.json`) with a tiered model — safe operations auto-approved, destructive operations always gated, and middle-ground operations that you decide during init.
-- **11 slash commands** (`/plan`, `/review`, `/test`, `/lesson`, `/checkpoint`, `/status`, `/simplify`, `/index`, `/save`, `/load`, `/backlog`) so common workflows are one command away.
+- **12 slash commands** (`/plan`, `/review`, `/test`, `/lesson`, `/checkpoint`, `/status`, `/simplify`, `/index`, `/save`, `/load`, `/backlog`) so common workflows are one command away.
 - **8 agent specifications** for subagent delegation — Plan, Research, Code Review, Test Runner, Build Validator, Code Architect, Code Simplifier, and Verify — each with defined context budgets and output contracts.
 - **A lessons-learned system** (`tasks/lessons.md`) that accumulates across sessions, so mistakes compound into preventive rules instead of being forgotten.
 - **Language-specific conventions** for Python, TypeScript, Go, and Rust that get appended to `CLAUDE.md` during init — best practices, linter configs, project structure, and testing patterns.
@@ -44,6 +44,8 @@ claude
 ```
 
 The scaffold script detects the cloned scaffolding history and reinitializes git automatically.
+
+Once inside Claude Code, type `/start` for a guided walkthrough, or see `GETTING_STARTED.md` for the full onboarding guide.
 
 ## What the Init Flow Looks Like
 
@@ -121,7 +123,7 @@ scaffolding/
 ├── CLAUDE.md                   # Agent constitution (with placeholders)
 ├── .claude/
 │   ├── settings.json           # Permission defaults
-│   ├── skills/                 # 11 slash commands
+│   ├── skills/                 # 12 slash commands
 │   └── hooks/                  # Main branch protection
 ├── .github/
 │   ├── ISSUE_TEMPLATE/         # Bug, feature, task templates
@@ -139,10 +141,11 @@ scaffolding/
 ```
 my-api/
 ├── CLAUDE.md                   # Customized with project name + Python conventions
+├── GETTING_STARTED.md          # First-session onboarding guide
 ├── .claude/
 │   ├── settings.json           # Permissions from your choices
-│   ├── skills/                 # /plan, /review, /test, /lesson, /checkpoint, /status,
-│   │                           #   /simplify, /index, /save, /load, /backlog
+│   ├── skills/                 # /start, /plan, /review, /test, /lesson, /checkpoint,
+│   │                           #   /status, /simplify, /index, /save, /load, /backlog
 │   └── hooks/                  # protect-main-branch.sh
 ├── .github/
 │   ├── ISSUE_TEMPLATE/         # Bug, feature, task issue forms
@@ -194,6 +197,7 @@ Language-specific conventions (Python, TypeScript, Go, Rust) are appended during
 
 | Command | What It Does |
 |---------|-------------|
+| `/start` | Guided first-session onboarding — plan your project and create your first issue |
 | `/plan` | Create a structured plan with confidence assessment in `tasks/todo.md` |
 | `/review` | Review changes with Four Questions evidence validation |
 | `/test` | Run tests by tier, analyze failures, propose fixes |
@@ -327,7 +331,7 @@ During `./scaffold` init, if the GitHub CLI is authenticated, you'll be prompted
 ### Running Tests
 
 ```bash
-# All tests (7 suites, 302 assertions)
+# All tests (7 suites, 317 assertions)
 bash tests/test_scaffold.sh
 
 # Single language

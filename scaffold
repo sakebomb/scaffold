@@ -742,7 +742,7 @@ make test
 This project is configured for [Claude Code](https://docs.anthropic.com/en/docs/claude-code) with:
 
 - Agent constitution (\`CLAUDE.md\`)
-- 11 slash commands: \`/plan\`, \`/review\`, \`/test\`, \`/backlog\`, \`/lesson\`, \`/checkpoint\`, \`/status\`, \`/simplify\`, \`/index\`, \`/save\`, \`/load\`
+- 12 slash commands: \`/start\`, \`/plan\`, \`/review\`, \`/test\`, \`/backlog\`, \`/lesson\`, \`/checkpoint\`, \`/status\`, \`/simplify\`, \`/index\`, \`/save\`, \`/load\`
 - 8 agent specifications in \`agents/\`
 - Task management in \`tasks/\`
 
@@ -751,6 +751,121 @@ This project is configured for [Claude Code](https://docs.anthropic.com/en/docs/
 [MIT](LICENSE)
 README
   success "README.md generated for ${PROJECT_NAME}"
+
+  # --- Generate GETTING_STARTED.md (first-session onboarding guide) ---
+  info "Generating getting started guide..."
+  local env_setup=""
+  case "$LANGUAGE" in
+    python)
+      env_setup="### Set Up Your Environment
+
+\`\`\`bash
+python -m venv .venv
+source .venv/bin/activate
+pip install -e '.[dev]'
+\`\`\`" ;;
+    typescript)
+      env_setup="### Set Up Your Environment
+
+\`\`\`bash
+npm install
+\`\`\`" ;;
+    go)
+      env_setup="### Set Up Your Environment
+
+\`\`\`bash
+go mod tidy
+\`\`\`" ;;
+    rust)
+      env_setup="### Set Up Your Environment
+
+\`\`\`bash
+cargo build
+\`\`\`" ;;
+    *)
+      env_setup="### Set Up Your Environment
+
+Install dependencies for your chosen language, then come back here." ;;
+  esac
+
+  cat > "$SCRIPT_DIR/GETTING_STARTED.md" <<GUIDE
+# Getting Started with ${PROJECT_NAME}
+
+Welcome! This guide walks you through your first 10 minutes with Claude Code.
+
+## Step 1: Set Up
+
+${env_setup}
+
+## Step 2: Launch Claude Code
+
+\`\`\`bash
+claude
+\`\`\`
+
+## Step 3: Start Building
+
+The easiest way to get going is to type:
+
+\`\`\`
+/start
+\`\`\`
+
+This will walk you through creating your first plan and (optionally) your first GitHub issue.
+
+**Or, if you already know what you want to build**, just tell Claude:
+
+\`\`\`
+I want to build [your idea here]. Help me create a plan.
+\`\`\`
+
+Claude will create a structured plan in \`tasks/todo.md\` and ask for your approval before writing any code.
+
+## Step 4: Build
+
+Once your plan is approved, tell Claude to start:
+
+\`\`\`
+Let's start on step 1.
+\`\`\`
+
+Claude will work through the plan step by step, committing as it goes. You stay in control — it will check in at each step.
+
+## Your Toolkit
+
+Here are the commands you'll use most:
+
+| Command | What It Does | When to Use It |
+|---------|-------------|----------------|
+| \`/start\` | Guided first-session setup | Right now (first time only) |
+| \`/plan\` | Create or refine a project plan | Starting a new feature or task |
+| \`/status\` | See progress and what's next | Any time you lose track |
+| \`/backlog show\` | See open GitHub issues by priority | Picking what to work on |
+| \`/backlog pick #N\` | Start working on issue #N | Beginning a task |
+| \`/checkpoint\` | Commit progress and update plan | After completing a step |
+| \`/test\` | Run tests and analyze results | Before committing |
+| \`/save\` | Save session state for later | Ending a session |
+| \`/load\` | Restore previous session context | Starting a new session |
+| \`/lesson\` | Record what you learned | After fixing a tricky bug |
+
+## How It Works
+
+Your project has a few key files that Claude reads automatically:
+
+- **\`CLAUDE.md\`** — The "rules" for how Claude works in your project (commit conventions, testing requirements, safety guardrails)
+- **\`tasks/todo.md\`** — Your current plan and progress
+- **\`tasks/lessons.md\`** — Things Claude learned from past sessions (mistakes to avoid, patterns that work)
+
+You don't need to read these files — Claude uses them behind the scenes. But feel free to peek if you're curious.
+
+## Tips
+
+- **Be specific.** "Build a REST API for managing todos with CRUD endpoints" works better than "build something."
+- **Let Claude plan first.** It will create a step-by-step plan before writing code. Review and approve it.
+- **Commit often.** Use \`/checkpoint\` after each working piece. Small commits are easier to review and revert.
+- **Ask questions.** Claude will ask you when it needs clarification. You can also ask it anything about the code.
+GUIDE
+  success "GETTING_STARTED.md generated"
 }
 
 apply_permissions() {
@@ -897,7 +1012,7 @@ show_summary() {
   echo "What's configured:"
   echo -e "  ${BOLD}CLAUDE.md${RESET}           Agent constitution + conventions"
   echo -e "  ${BOLD}.claude/settings${RESET}    Tiered permissions"
-  echo -e "  ${BOLD}.claude/skills/${RESET}     11 slash commands (/plan, /review, /backlog, /save, /load, ...)"
+  echo -e "  ${BOLD}.claude/skills/${RESET}     12 slash commands (/start, /plan, /backlog, /save, /load, ...)"
   echo -e "  ${BOLD}.claude/hooks/${RESET}      Main branch protection"
   echo -e "  ${BOLD}.github/${RESET}            Issue templates, PR template"
   echo -e "  ${BOLD}agents/${RESET}             8 agent specifications"
@@ -916,14 +1031,20 @@ show_summary() {
   echo "Next steps:"
   echo "  1. cd $(basename "$SCRIPT_DIR")"
   echo "  2. Start Claude Code: claude"
-  echo "  3. Try: /status to see your project plan"
-  echo "  4. Try: /plan to create or refine your plan"
+  echo "  3. Type: /start"
+  echo ""
+  echo -e "  ${DIM}Or skip /start and just tell Claude what to build:${RESET}"
+  echo "  \"I want to build [your idea]. Help me create a plan.\""
 
   if [[ "$ENABLE_RALPH" == true ]]; then
-    echo "  5. Try: ./scripts/ralph-loop.sh plan  (autonomous planning)"
-    echo "  6. Try: ./scripts/ralph-loop.sh build  (autonomous building)"
+    echo ""
+    echo "  Ralph Wiggum (autonomous loop):"
+    echo "  ./scripts/ralph-loop.sh plan   — autonomous planning"
+    echo "  ./scripts/ralph-loop.sh build  — autonomous building"
   fi
 
+  echo ""
+  echo -e "  ${DIM}Full walkthrough: GETTING_STARTED.md${RESET}"
   echo ""
 }
 
